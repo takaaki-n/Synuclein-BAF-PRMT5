@@ -1,4 +1,4 @@
-## Note that this file is just a record for in silico analysis and is not directly exetable.
+## Note that this file is just a record for in silico analysis and is not directly executable.
 
 # make chromosome txt file
 conda install -c bioconda ucsc-fetchchromsizes
