@@ -1,0 +1,155 @@
+## Note that this file is just a record for in silico analysis and is not diirectly exetable.
+
+# make chromosome txt file
+conda install -c bioconda ucsc-fetchchromsizes
+fetchChromSizes hg38 > genometable_hg38.txt
+sed -i ".txt" 's/chr//g' genometable_hg38_2.txt
+
+# make greylist from input
+R
+-------R_code----------
+library(GreyListChIP)
+fn <- "/Users/takaaki/Downloads/genometable_hg38_2.txt" 
+gl <- new("GreyList", karyoFile=fn)
+gl <- countReads(gl, "Input.bam")
+gl <- calcThreshold(gl, reps=100, sampleSize=30000, p=0.995,cores=4)
+gl <- makeGreyList(gl,maxGap=16384)
+export(gl,con="myGreyList_0.995.bed")
+q()
+-----------------------
+
+# blacklist was downloaded from "https://www.encodeproject.org/files/ENCFF356LFX/"
+# Ajusting blacklist format
+cat ~/blacklist.bed | sed "s/^chr//" >  blacklist2.bed
+
+# Filter blacklist and greylist (greylisit assembling was described in other file)
+for sample in `cat ~/samplelist.txt`
+    do
+        echo ${sample}
+        bedtools intersect -a ~/${sample}.bam -b ~/blacklist2.bed ~/myGreyList_0.995.bed -v > ${sample}_filtered.bam
+    done
+
+# make samplelist.txt which include below sample number list
+#Ic4105
+#Ic4324
+#Ic4325
+#Ic4326
+#Ic4327
+#Ic4328
+#Ic4329
+#Ic4330
+#Ic4331
+#Ic4332
+# Each file and detailed information was uploaded to the NCBI database (https://www.ncbi.nlm.nih.gov) as "GSE228331"
+
+# samtools index
+for sample in `cat ~/samplelist.txt`
+    do
+        echo ${sample}
+        samtools index ${sample}_filtered.bam
+    done
+
+# samtools merge and index    
+samtools merge -o naive_mergefil.bam ~/Ic4324_filtered.bam ~/Ic4325_filtered.bam ~/Ic4326_filtered.bam
+samtools merge -o bdnf_mergefil.bam ~/Ic4327_filtered.bam ~/Ic4328_filtered.bam ~/Ic4329_filtered.bam
+samtools merge -o dox_mergefiil.bam ~/Ic4330_filtered.bam ~/Ic4331_filtered.bam ~/Ic4332_filtered.bam
+samtools index ~/naive_mergefil.bam
+samtools index ~/bdnf_mergefil.bam 
+samtools index ~/dox_mergefil.bam    
+
+# call narrowpeak (vs Input)
+for sample in `cat ~/samplelist.txt | sed "1,1d"`
+    do
+        echo ${sample}
+        macs2 callpeak -t ~/${sample}_filtered.bam -c ~/Ic4105_filtered.bam -f BAM -p 0.01 -g hs -n filtered_${sample}_0.01 -B --cutoff-analysis 
+    done
+
+# call narrowpeak (Dox vs BDNF, Dox vs Naive)
+macs2 callpeak -t ~/dox_mergefil.bam -c ~/bdnf_mergefil.bam -f BAM -p 0.01 -g hs -n Dox_against_BDNF_narrow_peaks -B --cutoff-analysis
+macs2 callpeak -t ~/dox_mergefil.bam -c ~/naive_mergefil.bam -f BAM -p 0.01 -g hs -n Dox_against_Naive_narrow_peaks -B --cutoff-analysis
+
+# call narrowpeak (Naive vs input, BDNF vs input, Dox vs input)
+macs2 callpeak -t ~/naive_mergefil.bam -c ~/Ic4105_filtered.bam -f BAM -p 0.01 -g hs -n Naive_against_Input_narrow_peaks -B --cutoff-analysis
+macs2 callpeak -t ~/bdnf_mergefil.bam -c ~/Ic4105_filtered.bam -f BAM -p 0.01 -g hs -n BDNF_against_Input_narrow_peaks -B --cutoff-analysis
+macs2 callpeak -t ~/dox_mergefil.bam -c ~/Ic4105_filtered.bam -f BAM -p 0.01 -g hs -n Dox_against_Input_narrow_peaks -B --cutoff-analysis
+
+# call broadpeak (Dox vs BDNF, Dox vs Naive)
+macs2 callpeak -t ~/dox_mergefil.bam -c ~/bdnf_mergefil.bam -f BAM --broad --broad-cutoff 0.01 -p 0.01 -g hs -n Dox_against_BDNF_broad_peaks -B --cutoff-analysis    
+macs2 callpeak -t ~/dox_mergefil.bam -c ~/naive_mergefil.bam -f BAM --broad --broad-cutoff 0.01 -p 0.01 -g hs -n Dox_against_Naive_broad_peaks -B --cutoff-analysis  
+
+# TSS read density
+bamCoverage -b ~/Ic4105_filtered.bam \
+        -o Ic4105_filtered.bw \
+        --binSize 20 \
+        --normalizeUsing BPM \
+        --smoothLength 60 \
+        --extendReads 150 \
+        --centerReads \
+        -p 6 2> ~/Ic4105_filtered_bamCoverage.log
+
+bamCompare -b1 ~/naive_mergefil.bam -b2 ~/Ic4105_filtered.bam \
+-o naive_mergefil.bw \
+--scaleFactorsMethod SES  \
+--binSize 20 \
+--smoothLength 60 \
+--extendReads 150 \
+--centerReads \
+-p 6 2> ~/naive_mergefil_bamCoverage.log    
+    
+bamCompare -b1 ~/bdnf_mergefil.bam -b2 ~/Ic4105_filtered.bam \
+-o bdnf_mergefil.bw \
+--scaleFactorsMethod SES  \
+--binSize 20 \
+--smoothLength 60 \
+--extendReads 150 \
+--centerReads \
+-p 6 2> ~/bdnf_mergefil_bamCoverage.log    
+
+bamCompare -b1 ~/dox_mergefil.bam -b2 ~/Ic4105_filtered.bam \
+-o dox_mergefil.bw \
+--scaleFactorsMethod SES  \
+--binSize 20 \
+--smoothLength 60 \
+--extendReads 150 \
+--centerReads \
+-p 6 2> ~/dox_mergefil_bamCoverage.log  
+
+computeMatrix reference-point --referencePoint TSS \
+-b 5000 -a 5000 \
+-R ~/test.bed \  # test.bed file include gene information (obtained from UCFC, assembly: Dec.2013(GRCh38), group: Genes and Gene Predictions, track: NCBI RefSeq, table: RefSeq All, region: genonme, output format: BED)
+-S ~/Ic4105_filtered.bw ~/naive_mergefil.bw ~/bdnf_mergefil.bw ~/dox_mergefil.bw \
+--skipZeros \
+-o ~/output_allmergefil.gz \
+-p 6 \
+--outFileSortedRegions ~/output_allmergefil.bed 
+
+plotProfile -m ~/output_allmergefil.gz \
+-out TSS_allmergefil.png \
+--perGroup \
+--colors red black green purple \
+--plotTitle "" --samplesLabel  "input" "naive" "bdnf" "dox" \
+--refPointLabel "TSS" \
+-T "read density" \
+-z "" 
+
+# peak distribution analysis
+R
+-------R_code----------
+library(ChIPseeker)
+library(TxDb.Hsapiens.UCSC.hg38.knownGene)
+txdb <- TxDb.Hsapiens.UCSC.hg38.knownGene
+files <- getSampleFiles()
+cat /Naive_against_Input_narrow_peaks_summits.bed | sed "s/^/chr/" >  Naive_against_Input_narrow_peaks_summits_2.bed
+cat /BDNF_against_Input_narrow_peaks_summits.bed | sed "s/^/chr/" >  BDNF_against_Input_narrow_peaks_summits_2.bed
+cat /Dox_against_Input_narrow_peaks_summits.bed | sed "s/^/chr/" >  Dox_against_Input_narrow_peaks_summits_2.bed
+peak <- readPeakFile("~/Naive_against_Input_narrow_peaks_summits_2.bed")
+peak_NvsI <- peak[-54:-63]
+peak <- readPeakFile("~/BDNF_against_Input_narrow_peaks_summits_2.bed")
+peak_BvsI <- peak[-26:-33]
+peak <- readPeakFile("~/Dox_against_Input_narrow_peaks_summits_2.bed")
+peak_DvsI <- peak[-42:-46]
+peakAnnoList <- lapply(list(peak_NvsI, peak_BvsI, peak_DvsI), annotatePeak, TxDb=txdb,
+                       tssRegion=c(-3000, 3000), verbose=FALSE)
+plotAnnoBar(peakAnnoList)   
+q()
+-----------------------
