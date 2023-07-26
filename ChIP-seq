@@ -1,11 +1,11 @@
-## Note that this file is just a record for in silico analysis and is not diirectly exetable.
+## Note that this file is just a record for in silico analysis and is not directly exetable.
 
 # make chromosome txt file
 conda install -c bioconda ucsc-fetchchromsizes
 fetchChromSizes hg38 > genometable_hg38.txt
 sed -i ".txt" 's/chr//g' genometable_hg38_2.txt
 
-# make greylist from input
+# make greylist from input file
 R
 -------R_code----------
 library(GreyListChIP)
@@ -22,14 +22,14 @@ q()
 # Ajusting blacklist format
 cat ~/blacklist.bed | sed "s/^chr//" >  blacklist2.bed
 
-# Filter blacklist and greylist (greylisit assembling was described in other file)
+# Filter blacklist and greylist
 for sample in `cat ~/samplelist.txt`
     do
         echo ${sample}
         bedtools intersect -a ~/${sample}.bam -b ~/blacklist2.bed ~/myGreyList_0.995.bed -v > ${sample}_filtered.bam
     done
 
-# make samplelist.txt which include below sample number list
+# make samplelist.txt which include below sample name
 #Ic4105
 #Ic4324
 #Ic4325
