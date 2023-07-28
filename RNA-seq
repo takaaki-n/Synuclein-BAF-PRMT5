@@ -74,8 +74,6 @@ for (i in list_dataname){
 # make dataframe to compare datasets
 FCdata <- matrix(nrow=dim(gse)[1], ncol=length(list_dataname))
 rownames(FCdata) <- rownames(gse)
-Pdata <- matrix(nrow=dim(gse)[1], ncol=length(list_dataname))
-rownames(Pdata) <- rownames(gse)
 
 x = 1
 for (i in list_dataname){
@@ -83,23 +81,16 @@ for (i in list_dataname){
     t <- eval(parse(text = paste0("logFC_", i)))
     FC <- t$table$logFC
     names(FC) <- rownames(t$table)
-    P <- t$table$PValue
-    names(P) <- rownames(t$table)
     FCdata[names(FC), x] <- FC
-    Pdata[names(P), x] <- P
     x = x + 1
     }
 FCdata <- as.data.frame(FCdata)
 colnames(FCdata) <- list_dataname
-Pdata <- as.data.frame(Pdata)
-colnames(Pdata) <- list_dataname
 
 # limit analysis target to coding genes
 all_coding_genes <- getBM(attributes = c("hgnc_symbol"), filters=c("biotype"), values= list(biotype="protein_coding"), mart=mart)
 coding_gene <- intersect(all_coding_genes[,1], rownames(gse))
-
 FCdata <- FCdata[coding_gene,]
-Pdata <- Pdata[coding_gene,]
 
 # compare multiple datasets and calculate correlation coefficient
 FCdatax <- as.data.frame(sapply(FCdata, as.numeric))
