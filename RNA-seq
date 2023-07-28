@@ -96,8 +96,7 @@ colnames(Pdata) <- list_dataname
 
 # limit analysis target to coding genes
 all_coding_genes <- getBM(attributes = c("hgnc_symbol"), filters=c("biotype"), values= list(biotype="protein_coding"), mart=mart)
-coding_gene <- intersect(all_coding_genes[,1], rownames(idMap(gse, org = "hsa", from = "ENTREZID", to = "SYMBOL")))
-coding_gene_entrez <- intersect(all_coding_genes[,1], rownames(gse))
+coding_gene <- intersect(all_coding_genes[,1], rownames(gse))
 
 FCdata <- FCdata[coding_gene,]
 Pdata <- Pdata[coding_gene,]
