@@ -10,6 +10,7 @@ library(biomaRt)
 library(Heatplus)
 library(edgeR)
 library(ggplot2)
+library(corrplot)
 
 # name objects (matching each dataset)
 list_dataname <- list("??", "??", "??", ,,,)  # fill ?? (dataname)
