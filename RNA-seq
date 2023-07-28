@@ -9,6 +9,7 @@ library(EnrichmentBrowser)
 library(biomaRt)
 library(Heatplus)
 library(edgeR)
+library(ggplot2)
 
 # name objects (matching each dataset)
 list_dataname <- list("??", "??", "??", ,,,)  # fill ?? (dataname)
@@ -72,9 +73,9 @@ for (i in list_dataname){
 
 # make dataframe to compare datasets
 FCdata <- matrix(nrow=dim(gse)[1], ncol=length(list_dataname))
-rownames(FCdata) <- rownames(idMap(gse, org = "hsa", from = "ENTREZID", to = "SYMBOL"))
+rownames(FCdata) <- rownames(gse)
 Pdata <- matrix(nrow=dim(gse)[1], ncol=length(list_dataname))
-rownames(Pdata) <- rownames(idMap(gse, org = "hsa", from = "ENTREZID", to = "SYMBOL"))
+rownames(Pdata) <- rownames(gse)
 
 x = 1
 for (i in list_dataname){
