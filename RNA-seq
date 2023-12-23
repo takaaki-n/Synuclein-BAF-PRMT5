@@ -1,0 +1,120 @@
+## Note that this file is just a record for in silico analysis and is not directly executable.
+
+## Note that this is R code
+R
+
+# package
+library(tximeta)
+library(EnrichmentBrowser)
+library(biomaRt)
+library(Heatplus)
+library(edgeR)
+library(ggplot2)
+library(corrplot)
+
+# name objects (matching each dataset)
+list_dataname <- list("dataA", "dataB", "dataC")  # fill dataname
+
+## make tables (matching SRR numbers to condition) (table_dataA.txt) # fill dataname
+## example 
+#sample condition
+#SRR111 CT
+#SRR112 CT
+#SRR113 CT
+#SRR114 Tr
+#SRR115 Tr
+#SRR116 Tr
+
+# read RSEM files
+for (i in list_dataname){
+    print(i)
+    samplename <- paste0("samplesRSEM_", i)
+    tmp <- read.table(paste0("table_", i, ".txt"), header=TRUE)
+    assign(samplename, tmp)
+    filename <- paste0("filesRSEM_", i)
+    tmp2 <- file.path("filepath") #fill filepath with actual path to read RSEM files
+    assign(filename, tmp2)
+    }
+   
+# prepare "gse" data according to "tximeta" package manual
+# "gse" data will be named as "gse_dataA" (gse_dataname)
+for (i in list_dataname){
+    print(i)
+    files <- eval(parse(text = paste0("filesRSEM_", i)))
+    SRR <- eval(parse(text = paste0("samplesRSEM_", i, "$sample")))
+    condition=eval(parse(text = paste0("samplesRSEM_", i, "$condition")))
+    coldata <- data.frame(files=files, names=SRR, condition=condition, stringsAsFactors=FALSE)
+    gse <- tximeta(coldata, type="rsem")
+    rownames(gse) <- substr(rownames(gse), 1, 15)
+    gse <- idMap(gse, org = "hsa", from = "ENSEMBL", to = "ENTREZID")
+    tmp <- paste0("gse_", i)
+    assign(tmp, gse)
+    }
+
+# make expression data
+# expression data will be named as "logFC_dataA" (logFC_dataname)
+t <- c()
+for (i in list_dataname){
+    print(i)
+    gse <- eval(parse(text = paste0("gse_", i)))
+    gse <- idMap(gse, org = "hsa", from = "ENTREZID", to = "SYMBOL")
+    gse$GROUP <- ifelse(gse$condition == "Tr", 1, 0)
+    x <- assays(gse)[[1]]
+    group <- factor(c(gse$GROUP))
+    y <- DGEList(counts=x, group=group)
+    keep <- filterByExpr(y)
+    y <- y[keep, , keep.lib.sizes=FALSE]
+    y <- calcNormFactors(y)
+    design <- model.matrix(~group)
+    y <- estimateDisp(y, design)
+    et <- exactTest(y)
+    tmp <- paste0("logFC_", i)
+    assign(tmp, et)
+    }
+
+# make dataframe to compare datasets
+FCdata <- matrix(nrow=dim(gse)[1], ncol=length(list_dataname))
+rownames(FCdata) <- rownames(gse)
+
+x = 1
+for (i in list_dataname){
+    print(i)
+    t <- eval(parse(text = paste0("logFC_", i)))
+    FC <- t$table$logFC
+    names(FC) <- rownames(t$table)
+    FCdata[names(FC), x] <- FC
+    x = x + 1
+    }
+FCdata <- as.data.frame(FCdata)
+colnames(FCdata) <- list_dataname
+
+# limit analysis target to coding genes
+all_coding_genes <- getBM(attributes = c("hgnc_symbol"), filters=c("biotype"), values= list(biotype="protein_coding"), mart=mart)
+coding_gene <- intersect(all_coding_genes[,1], rownames(gse))
+FCdata <- FCdata[coding_gene,]
+
+# compare multiple datasets and calculate correlation coefficient
+FCdatax <- as.data.frame(sapply(FCdata, as.numeric))
+FCdata_corr <- cor(FCdatax, use="pairwise.complete.obs", method = "spearman")
+t <- cor.mtest(FCdatax, conf.level=0.95)
+corrplot(FCdata_corr,  col=rev(COL2("PiYG", n=200)), method="square", is.corr=FALSE, addCoef.col="black", p.mat=t$p)
+ 
+# compare two dataset and make scatter plot
+ggplot(FCdata, aes(dataA, dataB)) + geom_point(size=0.05) # fill dataname
+
+# heatmap
+t1 <- regHeatmap(as.matrix(FCdata), dendrogram=list(clustfun=hclust, distfun=dist, status="yes"), labels=list(cex=0.5, nrow=5), scale="none")
+plot(t1)
+
+# NRCAM data expression
+i <- dataA # fill dataname
+gse <- idMap(gse, org = "hsa", from = "ENTREZID", to = "SYMBOL")
+gse <- normalize(gse, norm.method = "vst")
+tmp <- paste0("NRCAM_normcountCT_", i)
+assign(tmp, assays(gse)[[2]]["NRCAM", gse$GROUP=="0"])
+tmp <- paste0("NRCAM_normcountTr_", i)
+assign(tmp, assays(gse)[[2]]["NRCAM", gse$GROUP=="1"])
+NRCAM_normcountCT <- eval(parse(text=paste0("NRCAM_normcountCT_", i)))
+NRCAM_normcountTr <- eval(parse(text=paste0("NRCAM_normcountTr_", i)))
+t <- t.test(NRCAM_normcountTr, NRCAM_normcountCT, paired=TRUE)
+t
