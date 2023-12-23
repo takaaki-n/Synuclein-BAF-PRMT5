@@ -13,9 +13,9 @@ library(ggplot2)
 library(corrplot)
 
 # name objects (matching each dataset)
-list_dataname <- list("??", "??", "??", ,,,)  # fill ?? (dataname)
+list_dataname <- list("dataA", "dataB", "dataC")  # fill dataname
 
-## make tables (matching SRR numbers to condition) (table_??.txt) fill ?? (dataname)
+## make tables (matching SRR numbers to condition) (table_dataA.txt) # fill dataname
 ## example 
 #sample condition
 #SRR111 CT
@@ -32,12 +32,12 @@ for (i in list_dataname){
     tmp <- read.table(paste0("table_", i, ".txt"), header=TRUE)
     assign(samplename, tmp)
     filename <- paste0("filesRSEM_", i)
-    tmp2 <- file.path("???") #fill ??? with filepath to read RSEM files
+    tmp2 <- file.path("filepath") #fill filepath with actual path to read RSEM files
     assign(filename, tmp2)
     }
    
 # prepare "gse" data according to "tximeta" package manual
-# "gse" data will be named as "gse_??" (?? = dataname)
+# "gse" data will be named as "gse_dataA" (gse_dataname)
 for (i in list_dataname){
     print(i)
     files <- eval(parse(text = paste0("filesRSEM_", i)))
@@ -52,7 +52,7 @@ for (i in list_dataname){
     }
 
 # make expression data
-# expression data will be named as "logFC_??" (?? = dataname)
+# expression data will be named as "logFC_dataA" (logFC_dataname)
 t <- c()
 for (i in list_dataname){
     print(i)
@@ -100,14 +100,14 @@ t <- cor.mtest(FCdatax, conf.level=0.95)
 corrplot(FCdata_corr,  col=rev(COL2("PiYG", n=200)), method="square", is.corr=FALSE, addCoef.col="black", p.mat=t$p)
  
 # compare two dataset and make scatter plot
-ggplot(FCdata, aes(??, ??)) + geom_point(size=0.05) # fill ?? (dataname)
+ggplot(FCdata, aes(dataA, dataB)) + geom_point(size=0.05) # fill dataname
 
 # heatmap
 t1 <- regHeatmap(as.matrix(FCdata), dendrogram=list(clustfun=hclust, distfun=dist, status="yes"), labels=list(cex=0.5, nrow=5), scale="none")
 plot(t1)
 
 # NRCAM data expression
-i <- ?? # fill ?? (dataname)
+i <- dataA # fill dataname
 gse <- idMap(gse, org = "hsa", from = "ENTREZID", to = "SYMBOL")
 gse <- normalize(gse, norm.method = "vst")
 tmp <- paste0("NRCAM_normcountCT_", i)
